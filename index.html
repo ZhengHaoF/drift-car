@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#e8641c" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23f0a80c'/></svg>" />
+    <title>漂移赛车</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="dist">0m</div>
+      <div id="coinHud"><i></i><span id="coinN">0</span></div>
+    </div>
+
+    <div id="start" class="overlay">
+      <div class="banner">漂移赛车</div>
+      <div class="sub">点了就漂 · 冲出路面就完</div>
+      <div id="startBest" class="stat">最高纪录 0m</div>
+      <div class="tap">点击开始</div>
+    </div>
+
+    <div id="results" class="overlay hidden">
+      <div id="resRecord" class="record hidden">新纪录！</div>
+      <div class="banner small">距离 <span id="resDist">0</span>m</div>
+      <div id="resBest" class="stat">最高纪录 0m</div>
+      <div id="resCoins" class="stat">金币 +0</div>
+      <div class="tap">点击任意处重新开始</div>
+    </div>
+
+    <div id="pause" class="overlay hidden">
+      <div class="banner small">已暂停</div>
+      <div class="tap">点击继续</div>
+    </div>
+
+    <div id="hint" class="hidden">点击！<div class="arr">▼</div></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

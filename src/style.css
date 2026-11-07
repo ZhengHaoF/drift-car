@@ -1,0 +1,166 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.banner {
+  background: #ffd400;
+  color: #151515;
+  font-size: 44px;
+  font-weight: 900;
+  padding: 10px 32px;
+  letter-spacing: 5px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.18);
+  transform: rotate(-1.5deg);
+}
+
+.banner.small {
+  font-size: 30px;
+  letter-spacing: 2px;
+}
+
+.sub {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.92;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.stat {
+  color: #fff;
+  font-size: 15px;
+  opacity: 0.85;
+}
+
+.tap {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 18px;
+  animation: pulse 1.1s ease-in-out infinite;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.55;
+  }
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#dist {
+  position: absolute;
+  left: 20px;
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  font-size: 58px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.22);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+#coinHud {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 999px;
+  padding: 6px 14px 6px 10px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+#coinHud i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe27a, #f0a80c 70%);
+  display: inline-block;
+}
+
+#hint {
+  position: fixed;
+  left: 50%;
+  bottom: 32%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  text-align: center;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 900;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+#hint .arr {
+  font-size: 34px;
+}
+
+.record {
+  background: #ff4747;
+  color: #fff;
+  font-weight: 900;
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 18px;
+  transform: rotate(-2deg);
+  animation: pulse 0.7s ease-in-out infinite;
+}
