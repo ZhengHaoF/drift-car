@@ -1,5 +1,14 @@
 import { T } from '../config'
-import { DIRS, type Vec2 } from './car'
+import { DIRS, HEAD_A, type Vec2 } from './car'
+
+/** 路面生成器公共接口（经典之字路 / 拖拽曲率路带，ADR-0014） */
+export interface IRoadGen {
+  reset(): void
+  update(carX: number, carZ: number): void
+  pointOnRoad(x: number, z: number): boolean
+  /** 本局出生点（含初始朝向） */
+  getSpawn(): { x: number; z: number; ang: number }
+}
 
 export interface Coin {
   x: number
@@ -26,7 +35,7 @@ export interface Segment {
  * 只维护"当前末端 + 下一方向 + 下一段长"；V 形折弯，段长随机且随距离收窄。
  * 网格的创建/销毁通过 onAdd/onRemove 回调交给渲染层。
  */
-export class RoadGen {
+export class RoadGen implements IRoadGen {
   segments: Segment[] = []
   onAdd: ((s: Segment) => void) | null = null
   onRemove: ((s: Segment) => void) | null = null
@@ -73,6 +82,10 @@ export class RoadGen {
       if (along >= -cap && along <= s.len + cap && Math.abs(across) <= T.roadHalfWidth) return true
     }
     return false
+  }
+
+  getSpawn() {
+    return { x: DIRS[0].x * 2, z: DIRS[0].z * 2, ang: HEAD_A }
   }
 
   private makeSeg() {

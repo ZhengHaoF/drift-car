@@ -17,9 +17,20 @@
 
     <div id="start" class="overlay">
       <div class="banner">漂移赛车</div>
-      <div class="sub">点了就漂 · 冲出路面就完</div>
-      <div id="startBest" class="stat">最高纪录 0m</div>
-      <div class="tap">点击开始</div>
+      <div class="sub">选个玩法</div>
+      <div class="modes">
+        <div class="mode-card" id="modeClassic" data-ui>
+          <b>经典挑战</b>
+          <span>点击屏幕切换<br />切换即漂移</span>
+          <i id="bestClassic">纪录 0m</i>
+        </div>
+        <div class="mode-card" id="modeDrag" data-ui>
+          <b>自由拖拽</b>
+          <span>按住拖动转向<br />甩急了自动漂移</span>
+          <i id="bestDrag">纪录 0m</i>
+        </div>
+      </div>
+      <div id="startCoins" class="stat">累计金币 0</div>
     </div>
 
     <div id="results" class="overlay hidden">
@@ -28,6 +39,7 @@
       <div id="resBest" class="stat">最高纪录 0m</div>
       <div id="resCoins" class="stat">金币 +0</div>
       <div class="tap">点击任意处重新开始</div>
+      <div id="switchMode" class="mode-link" data-ui>换模式</div>
     </div>
 
     <div id="pause" class="overlay hidden">
@@ -35,7 +47,7 @@
       <div class="tap">点击继续</div>
     </div>
 
-    <div id="hint" class="hidden">点击！<div class="arr">▼</div></div>
+    <div id="hint" class="hidden"><span id="hintText">点击！</span><div class="arr">▼</div></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { T } from '../config'
 import { DIRS } from '../game/car'
 import type { Coin, Segment } from '../game/road'
+import type { RibbonQuad } from '../game/splineRoad'
 import { buildCar, type CarModel } from './carModel'
 import { TireMarks, Smoke } from './effects'
 
@@ -27,6 +28,15 @@ export class SceneView {
   private segMeshes = new Map<number, THREE.Mesh>()
   private bendMeshes = new Map<number, THREE.Mesh>()
   private lastSeg: Segment | null = null
+  /** 拖拽模式路带：单个动态 BufferGeometry 环形缓冲（顶面+两侧壁，顶点色携带主题） */
+  private ribbonPos!: Float32Array
+  private ribbonNor!: Float32Array
+  private ribbonCol!: Float32Array
+  private ribbonGeom!: THREE.BufferGeometry
+  private ribbonMat!: THREE.MeshLambertMaterial
+  private themeRGB: Array<[number, number, number]> = []
+  private ribbonCursor = 0
+  private ribbonUsed = 0
   private dummy = new THREE.Object3D()
   private carModel: CarModel
   /** 特效发射由主循环直接调用（漂移胎印/烟雾） */
@@ -71,6 +81,52 @@ export class SceneView {
     for (let i = 0; i < COIN_CAP; i++) this.coinInst.setMatrixAt(i, this.dummy.matrix)
     this.coinInst.instanceMatrix.needsUpdate = true
     this.scene.add(this.coinInst)
+
+    // 路带：主题路面色预转线性空间（顶点色与经典材质同色源）
+    this.themeRGB = T.themes.map((th) => {
+      const c = new THREE.Color(th.road)
+      return [c.r, c.g, c.b]
+    })
+    this.ribbonMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })
+    {
+      const n = T.ribbonCap * 12
+      this.ribbonPos = new Float32Array(n * 3)
+      this.ribbonNor = new Float32Array(n * 3)
+      this.ribbonCol = new Float32Array(n * 3)
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.BufferAttribute(this.ribbonPos, 3))
+      g.setAttribute('normal', new THREE.BufferAttribute(this.ribbonNor, 3))
+      g.setAttribute('color', new THREE.BufferAttribute(this.ribbonCol, 3))
+      const idx = new Uint32Array(T.ribbonCap * 18)
+      for (let q = 0; q < T.ribbonCap; q++) {
+        const v = q * 12
+        const o = q * 18
+        idx[o] = v
+        idx[o + 1] = v + 1
+        idx[o + 2] = v + 2
+        idx[o + 3] = v
+        idx[o + 4] = v + 2
+        idx[o + 5] = v + 3
+        idx[o + 6] = v + 4
+        idx[o + 7] = v + 5
+        idx[o + 8] = v + 6
+        idx[o + 9] = v + 4
+        idx[o + 10] = v + 6
+        idx[o + 11] = v + 7
+        idx[o + 12] = v + 8
+        idx[o + 13] = v + 9
+        idx[o + 14] = v + 10
+        idx[o + 15] = v + 8
+        idx[o + 16] = v + 10
+        idx[o + 17] = v + 11
+      }
+      g.setIndex(new THREE.BufferAttribute(idx, 1))
+      g.setDrawRange(0, 0)
+      this.ribbonGeom = g
+      const mesh = new THREE.Mesh(g, this.ribbonMat)
+      mesh.frustumCulled = false
+      this.scene.add(mesh)
+    }
 
     this.carModel = buildCar()
     this.scene.add(this.carModel.group)
@@ -146,14 +202,7 @@ export class SceneView {
       this.bendMeshes.set(s.i, tri)
     }
     this.lastSeg = s
-    for (const c of s.coins) {
-      let slot = this.freeCoinSlots.pop()
-      if (slot === undefined) {
-        if (this.coinTop >= COIN_CAP) continue // 池满：金币不可见但逻辑仍可拾取（罕见）
-        slot = this.coinTop++
-      }
-      this.coinSlots.set(c, slot)
-    }
+    for (const c of s.coins) this.addCoin(c)
   }
 
   removeSegment(s: Segment) {
@@ -169,16 +218,79 @@ export class SceneView {
       this.bendMeshes.delete(s.i)
     }
     if (this.lastSeg === s) this.lastSeg = null
-    for (const c of s.coins) {
-      const slot = this.coinSlots.get(c)
-      if (slot !== undefined) {
-        this.coinSlots.delete(c)
-        this.freeCoinSlots.push(slot)
-        this.hideDummy()
-        this.coinInst.setMatrixAt(slot, this.dummy.matrix)
-        this.coinInst.instanceMatrix.needsUpdate = true
-      }
+    for (const c of s.coins) this.removeCoin(c)
+  }
+
+  /** 金币槽位管理（经典/拖拽两模式共用，ADR-0014） */
+  addCoin(c: Coin) {
+    let slot = this.freeCoinSlots.pop()
+    if (slot === undefined) {
+      if (this.coinTop >= COIN_CAP) return // 池满：金币不可见但逻辑仍可拾取（罕见）
+      slot = this.coinTop++
     }
+    this.coinSlots.set(c, slot)
+  }
+
+  removeCoin(c: Coin) {
+    const slot = this.coinSlots.get(c)
+    if (slot === undefined) return
+    this.coinSlots.delete(c)
+    this.freeCoinSlots.push(slot)
+    this.hideDummy()
+    this.coinInst.setMatrixAt(slot, this.dummy.matrix)
+    this.coinInst.instanceMatrix.needsUpdate = true
+  }
+
+  /** 拖拽模式路带：写入一枚路带四边形（顶面 + 左右壁，主题色取自当前 themeIdx） */
+  addRibbonQuad(q: RibbonQuad) {
+    const s = this.ribbonCursor
+    const [r, g, b] = this.themeRGB[this.themeIdx]
+    const wR = r * 0.72
+    const wG = g * 0.72
+    const wB = b * 0.72
+    const top = 0.24
+    // 行进方向与左法线
+    const fx = (q.cx + q.dx - q.ax - q.bx) / 2
+    const fz = (q.cz + q.dz - q.az - q.bz) / 2
+    const fl = Math.hypot(fx, fz) || 1
+    const lnx = fz / fl
+    const lnz = -fx / fl
+    const P = this.ribbonPos
+    const N = this.ribbonNor
+    const C = this.ribbonCol
+    const o = s * 36
+    const set = (k: number, x: number, y: number, z: number, nx: number, ny: number, nz: number, cr: number, cg: number, cb: number) => {
+      P[o + k * 3] = x
+      P[o + k * 3 + 1] = y
+      P[o + k * 3 + 2] = z
+      N[o + k * 3] = nx
+      N[o + k * 3 + 1] = ny
+      N[o + k * 3 + 2] = nz
+      C[o + k * 3] = cr
+      C[o + k * 3 + 1] = cg
+      C[o + k * 3 + 2] = cb
+    }
+    // 顶面 0..3
+    set(0, q.ax, top, q.az, 0, 1, 0, r, g, b)
+    set(1, q.bx, top, q.bz, 0, 1, 0, r, g, b)
+    set(2, q.cx, top, q.cz, 0, 1, 0, r, g, b)
+    set(3, q.dx, top, q.dz, 0, 1, 0, r, g, b)
+    // 左壁 4..7
+    set(4, q.ax, top, q.az, lnx, 0, lnz, wR, wG, wB)
+    set(5, q.dx, top, q.dz, lnx, 0, lnz, wR, wG, wB)
+    set(6, q.dx, 0, q.dz, lnx, 0, lnz, wR, wG, wB)
+    set(7, q.ax, 0, q.az, lnx, 0, lnz, wR, wG, wB)
+    // 右壁 8..11
+    set(8, q.bx, top, q.bz, -lnx, 0, -lnz, wR, wG, wB)
+    set(9, q.cx, top, q.cz, -lnx, 0, -lnz, wR, wG, wB)
+    set(10, q.cx, 0, q.cz, -lnx, 0, -lnz, wR, wG, wB)
+    set(11, q.bx, 0, q.bz, -lnx, 0, -lnz, wR, wG, wB)
+    this.ribbonCursor = (s + 1) % T.ribbonCap
+    this.ribbonUsed = Math.min(this.ribbonUsed + 1, T.ribbonCap)
+    this.ribbonGeom.setDrawRange(0, this.ribbonUsed * 18)
+    ;(this.ribbonGeom.attributes.position as THREE.BufferAttribute).needsUpdate = true
+    ;(this.ribbonGeom.attributes.normal as THREE.BufferAttribute).needsUpdate = true
+    ;(this.ribbonGeom.attributes.color as THREE.BufferAttribute).needsUpdate = true
   }
 
   syncCoins(time: number) {
@@ -222,14 +334,19 @@ export class SceneView {
     g.scale.setScalar(1)
     const spin = -(car.speed * dt) / this.carModel.wheelRadius
     for (const w of this.carModel.wheels) w.rotation.x += spin
-    for (const w of this.carModel.frontWheels) w.rotation.y = steer
+    // 前轮 counter-steer：漂移时朝速度方向反向修正（ADR-0014）
+    for (const w of this.carModel.frontWheels) {
+      w.rotation.y = THREE.MathUtils.clamp(steer * 0.6 - car.slide * 1.3, -0.55, 0.55)
+    }
     this.hintCone.position.set(car.x, 2.05 + Math.sin(time * 4) * 0.12, car.z)
   }
 
-  updateCamera(car: { x: number; z: number; yaw: number }, state: string, dt: number) {
+  updateCamera(car: { x: number; z: number; yaw: number; velAngle: number }, state: string, dt: number, mode: string) {
     if (state === 'falling' || state === 'results') return // ADR-0010：相机停住看车坠落
-    const f0 = -Math.sin(car.yaw)
-    const f2 = -Math.cos(car.yaw)
+    // 拖拽模式视线沿实际运动方向前引（看得出侧滑），经典沿车头
+    const leadAng = mode === 'drag' ? car.velAngle : car.yaw
+    const f0 = -Math.sin(leadAng)
+    const f2 = -Math.cos(leadAng)
     const k = 1 - Math.exp(-5 * dt)
     this.lookTarget.lerp(this.tmpV.set(car.x + f0 * T.camLead, 0.3, car.z + f2 * T.camLead), k)
     this.camera.position.set(car.x, T.camHeight, car.z + T.camBack)
@@ -269,6 +386,25 @@ export class SceneView {
     g.position.y = 0.24
     this.lastSeg = null
     this.ground.position.y = 0
+    // 经典路渲染残留防御性清理
+    for (const [, m] of this.segMeshes) this.scene.remove(m)
+    this.segMeshes.clear()
+    for (const [, t] of this.bendMeshes) {
+      this.scene.remove(t)
+      t.geometry.dispose()
+    }
+    this.bendMeshes.clear()
+    // 路带缓冲与金币槽位全部回收
+    this.ribbonCursor = 0
+    this.ribbonUsed = 0
+    this.ribbonGeom.setDrawRange(0, 0)
+    for (const [, slot] of this.coinSlots) {
+      this.freeCoinSlots.push(slot)
+      this.hideDummy()
+      this.coinInst.setMatrixAt(slot, this.dummy.matrix)
+    }
+    this.coinSlots.clear()
+    this.coinInst.instanceMatrix.needsUpdate = true
     this.setTheme(0)
   }
 

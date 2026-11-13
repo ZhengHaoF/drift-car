@@ -23,6 +23,8 @@ export class TireMarks {
   private pos: Float32Array
   private col: Float32Array
   private ages: Float32Array
+  /** 每章胎印的初始透明度（随漂移强度变化，ADR-0014） */
+  private baseAlpha: Float32Array
   private cursor = 0
   private used = 0
 
@@ -30,6 +32,8 @@ export class TireMarks {
     this.pos = new Float32Array(T.maxTireQuads * 4 * 3)
     this.col = new Float32Array(T.maxTireQuads * 4 * 4)
     this.ages = new Float32Array(T.maxTireQuads)
+    this.baseAlpha = new Float32Array(T.maxTireQuads)
+    this.baseAlpha.fill(0.4)
     const geom = new THREE.BufferGeometry()
     geom.setAttribute('position', new THREE.BufferAttribute(this.pos, 3))
     geom.setAttribute('color', new THREE.BufferAttribute(this.col, 4))
@@ -54,8 +58,8 @@ export class TireMarks {
     scene.add(mesh)
   }
 
-  /** 在 (x, z) 盖一个与车头 yaw 对齐的胎印 */
-  stamp(x: number, z: number, yaw: number) {
+  /** 在 (x, z) 盖一个与车头 yaw 对齐的胎印，alpha 随漂移强度可变 */
+  stamp(x: number, z: number, yaw: number, alpha = 0.4) {
     const w = 0.13
     const l = 0.26
     const fx = -Math.sin(yaw)
@@ -78,8 +82,9 @@ export class TireMarks {
       this.col[co + k * 4] = 0.07
       this.col[co + k * 4 + 1] = 0.07
       this.col[co + k * 4 + 2] = 0.07
-      this.col[co + k * 4 + 3] = 0.4
+      this.col[co + k * 4 + 3] = alpha
     }
+    this.baseAlpha[q] = alpha
     this.ages[q] = 0
     this.cursor = (q + 1) % T.maxTireQuads
     this.used = Math.min(this.used + 1, T.maxTireQuads)
@@ -92,7 +97,7 @@ export class TireMarks {
     if (this.used === 0) return
     for (let q = 0; q < this.used; q++) {
       this.ages[q] += dt
-      const a = Math.max(0, 1 - this.ages[q] / T.tireFadeTime) * 0.4
+      const a = Math.max(0, 1 - this.ages[q] / T.tireFadeTime) * this.baseAlpha[q]
       const co = q * 16
       this.col[co + 3] = a
       this.col[co + 7] = a

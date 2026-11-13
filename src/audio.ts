@@ -7,6 +7,7 @@ export class Sfx {
   private noiseBuf: AudioBuffer | null = null
   private driftSrc: AudioBufferSourceNode | null = null
   private driftGain: GainNode | null = null
+  private driftFilter: BiquadFilterNode | null = null
 
   unlock() {
     if (this.ctx) {
@@ -25,12 +26,22 @@ export class Sfx {
     this.noiseBuf = buf
   }
 
-  /** 漂移胎噪开关（白噪声 + 带通） */
-  setDrift(on: boolean) {
+  /** 漂移胎噪：强度 0~1 连续控制（音量与音色随侧滑角变化，ADR-0014）；0 = 关 */
+  setDriftIntensity(intensity: number) {
     const ctx = this.ctx
     if (!ctx || !this.master) return
     const t = ctx.currentTime
-    if (on && !this.driftSrc) {
+    if (intensity <= 0.01) {
+      if (this.driftSrc && this.driftGain) {
+        this.driftGain.gain.setTargetAtTime(0.0001, t, 0.06)
+        this.driftSrc.stop(t + 0.4)
+        this.driftSrc = null
+        this.driftGain = null
+        this.driftFilter = null
+      }
+      return
+    }
+    if (!this.driftSrc) {
       const src = ctx.createBufferSource()
       src.buffer = this.noiseBuf
       src.loop = true
@@ -40,18 +51,18 @@ export class Sfx {
       bp.Q.value = 0.7
       const g = ctx.createGain()
       g.gain.setValueAtTime(0.0001, t)
-      g.gain.exponentialRampToValueAtTime(T.driftGain, t + 0.09)
+      g.gain.exponentialRampToValueAtTime(T.driftGain * 0.35, t + 0.09)
       src.connect(bp)
       bp.connect(g)
       g.connect(this.master)
       src.start()
       this.driftSrc = src
       this.driftGain = g
-    } else if (!on && this.driftSrc && this.driftGain) {
-      this.driftGain.gain.setTargetAtTime(0.0001, t, 0.06)
-      this.driftSrc.stop(t + 0.4)
-      this.driftSrc = null
-      this.driftGain = null
+      this.driftFilter = bp
+    }
+    if (this.driftGain && this.driftFilter) {
+      this.driftGain.gain.setTargetAtTime(T.driftGain * (0.35 + 0.65 * intensity), t, 0.05)
+      this.driftFilter.frequency.setTargetAtTime(650 + 700 * intensity, t, 0.08)
     }
   }
 

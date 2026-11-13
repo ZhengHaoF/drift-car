@@ -36,11 +36,14 @@ const probe = () =>
     const c = g.car
     return {
       state: g.state,
+      mode: g.mode,
       dist: Math.round(c.dist),
       drifting: c.drifting,
       toggles: c.toggles,
       coins: g.coinsRun,
       best: g.best,
+      yaw: +c.yaw.toFixed(2),
+      slide: +c.slide.toFixed(3),
     }
   })
 
@@ -111,8 +114,8 @@ await page.waitForTimeout(1600)
 expect((await probe())?.state === 'start', '初始为 start 状态')
 await shot('01-start')
 
-// 2. 点击开始 → playing + 新手提示（绿三角）
-await tap()
+// 2. 点击"经典挑战"卡片 → playing + 新手提示（绿三角）
+await page.locator('#modeClassic').click()
 await waitState('playing')
 await page.waitForTimeout(400)
 expect((await probe()).dist >= 0, '已进入 playing')
@@ -151,10 +154,10 @@ await waitState('results', 5000)
 expect(preFallDist > 0, `坠前有距离（${preFallDist}m）`)
 await shot('07-results')
 
-// 6. 最高分与首局标记已保存
+// 6. 最高分与首局标记已保存（分模式键，ADR-0014）
 const saved = await page.evaluate(() => ({
-  best: localStorage.getItem('drift.best'),
-  played: localStorage.getItem('drift.played'),
+  best: localStorage.getItem('drift.best.classic'),
+  played: localStorage.getItem('drift.played.classic'),
   coins: localStorage.getItem('drift.coins'),
 }))
 expect(saved.best && Number(saved.best) > 0, `最高分已保存: ${saved.best}m`)
@@ -167,6 +170,80 @@ const s9 = await probe()
 expect(s9.dist < 5 && s9.toggles === 0, '重开后距离与切换次数归零')
 await page.waitForTimeout(500)
 await shot('08-restart')
+
+// —— 8. 自由拖拽模式（ADR-0014）——
+await page.reload()
+await page.waitForTimeout(1400)
+expect((await probe())?.state === 'start', '重载后回到模式选择页')
+await page.locator('#modeDrag').click()
+await waitState('playing')
+expect((await probe()).mode === 'drag', '进入拖拽模式')
+await page.waitForTimeout(300)
+await shot('09-drag-playing')
+
+// 缓拖保持抓地：小幅拖动 → 目标朝向小 → 不误触漂移
+await page.mouse.move(195, 600)
+await page.mouse.down()
+await page.mouse.move(212, 585, { steps: 8 })
+await page.waitForTimeout(500)
+expect((await probe()).drifting === false, '缓拖保持抓地（不误触漂移）')
+await shot('10-drag-gentle')
+
+// 急甩 → 抓地突破 → 自动漂移
+await page.mouse.move(360, 560, { steps: 4 })
+const t0 = Date.now()
+let driftSeen = false
+while (Date.now() - t0 < 1500) {
+  if ((await probe()).drifting) {
+    driftSeen = true
+    break
+  }
+  await page.waitForTimeout(30)
+}
+expect(driftSeen, '急甩自动触发漂移')
+await page.waitForTimeout(120)
+await shot('11-drag-drift')
+
+// 松手保持朝向
+await page.mouse.up()
+await page.waitForTimeout(600)
+const yawHeld = (await probe()).yaw
+await page.waitForTimeout(300)
+const pHold2 = await probe()
+expect(Math.abs(pHold2.yaw - yawHeld) < 0.1, `松手保持朝向直行（${yawHeld} → ${pHold2.yaw}）`)
+
+// 满舵冲出赛道 → 坠落
+await page.mouse.move(195, 620)
+await page.mouse.down()
+await page.mouse.move(360, 640, { steps: 4 })
+await waitState('falling', 12000)
+await page.waitForTimeout(300)
+await shot('12-drag-falling')
+await waitState('results', 5000)
+await shot('13-drag-results')
+
+const savedDrag = await page.evaluate(() => ({
+  best: localStorage.getItem('drift.best.drag'),
+  played: localStorage.getItem('drift.played.drag'),
+}))
+expect(savedDrag.best && Number(savedDrag.best) > 0, `拖拽模式最高分已保存: ${savedDrag.best}m`)
+expect(savedDrag.played === '1', '拖拽首局标记已写入')
+
+// 同模式重开
+await tap()
+await waitState('playing')
+const pRe = await probe()
+expect(pRe.mode === 'drag' && pRe.dist < 5, '拖拽模式同模式重开成功')
+
+// 再死一次到结算 → 换模式返回选择页
+await page.mouse.move(195, 620)
+await page.mouse.down()
+await page.mouse.move(360, 640, { steps: 4 })
+await waitState('falling', 12000)
+await waitState('results', 5000)
+await page.locator('#switchMode').click()
+await page.waitForTimeout(300)
+expect((await probe())?.state === 'start', '换模式返回选择页')
 
 console.log('---')
 console.log('最终状态:', JSON.stringify(await probe()))

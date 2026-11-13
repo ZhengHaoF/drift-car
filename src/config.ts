@@ -54,4 +54,19 @@ export const T = {
 
   // —— 音频（ADR-0005）——
   driftGain: 0.22, // 胎噪音量
+
+  // —— 自由拖拽模式（ADR-0014）——
+  steerClampDeg: 75, // 目标朝向相对屏幕正上的上限（deg）
+  maxYawRate: 3.2, // 车头追赶角速度上限 rad/s
+  yawChaseK: 4.5, // 车头追赶比例系数：目标差 × K = 期望角速度
+  gripALow: 18, // 侧向需求低于此值全抓地 m/s²
+  gripAHigh: 26, // 高于此值完全失去抓地
+  gripCatchRate: 16, // 抓地时速度方向追赶速率 rad/s
+  driftCatchRate: 6, // 漂移时速度方向追赶速率 rad/s（甩尾幅度）
+  slideEnter: 0.14, // 漂移特效进入的侧滑角 rad
+  slideExit: 0.08, // 漂移特效退出的侧滑角 rad（滞回）
+  driftScrub: 0.35, // 漂移掉速：满侧滑时速度损失比例
+  ribbonStep: 2, // 路带中心线采样步长 m
+  joystickR: 90, // 虚拟摇杆满幅像素
+  ribbonCap: 2048, // 路带四边形环形缓冲上限（≈4km）
 }
