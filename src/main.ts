@@ -32,6 +32,8 @@ game.onResults = () => {
 
 let paused = false
 const keys = new Set<string>()
+/** 反转拖拽方向：开 = 左拖右转（用户偏好设置，ADR-0014 补记） */
+let invertDrag = localStorage.getItem('drift.invert') === '1'
 
 function refreshMenu() {
   ui.showStart(
@@ -39,6 +41,7 @@ function refreshMenu() {
     Number(localStorage.getItem('drift.best.drag') || 0),
     game.coinsTotal,
   )
+  ui.setInvertLabel(invertDrag)
 }
 
 function beginRun(mode: ModeId) {
@@ -98,7 +101,8 @@ function applyDrag(cx: number, cy: number) {
   const mag01 = Math.min(1, Math.hypot(dx, dy) / T.joystickR)
   const lim = (T.steerClampDeg * Math.PI) / 180
   // 拖动方向 → 目标朝向：yaw 正 = 屏幕左上、负 = 屏幕右上（与车头约定一致）
-  const ang = Math.atan2(-dx, -dy)
+  // 反转拖拽：水平分量取反（左拖右转），纵向不变
+  const ang = Math.atan2(invertDrag ? dx : -dx, -dy)
   game.car.targetYaw = Math.max(-lim, Math.min(lim, ang)) * mag01
 }
 
@@ -170,6 +174,12 @@ document.getElementById('switchMode')!.addEventListener('click', () => {
   sfx.click()
   toMenu()
 })
+document.getElementById('invertToggle')!.addEventListener('click', () => {
+  invertDrag = !invertDrag
+  localStorage.setItem('drift.invert', invertDrag ? '1' : '0')
+  ui.setInvertLabel(invertDrag)
+  sfx.click()
+})
 
 // —— 启动：经典路摆作模式选择页背景 ——
 game.menu()
@@ -187,14 +197,15 @@ view.renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
   if (!paused) {
-    // 拖拽模式键盘备用转向（桌面调试）
+    // 拖拽模式键盘备用转向（桌面调试）；反转开启时左右键语义同步翻转
     if (game.state === 'playing' && game.mode === 'drag') {
       const lim = (T.steerClampDeg * Math.PI) / 180
+      const kdir = invertDrag ? -1 : 1
       if (keys.has('ArrowLeft') || keys.has('KeyA')) {
-        game.car.targetYaw = Math.min(lim, game.car.targetYaw + 2.6 * dt) // 左 = 屏幕左上 = +yaw
+        game.car.targetYaw = Math.min(lim, Math.max(-lim, game.car.targetYaw + 2.6 * kdir * dt)) // 左 = 屏幕左上 = +yaw
       }
       if (keys.has('ArrowRight') || keys.has('KeyD')) {
-        game.car.targetYaw = Math.max(-lim, game.car.targetYaw - 2.6 * dt)
+        game.car.targetYaw = Math.min(lim, Math.max(-lim, game.car.targetYaw - 2.6 * kdir * dt))
       }
     }
 

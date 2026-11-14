@@ -245,6 +245,33 @@ await page.locator('#switchMode').click()
 await page.waitForTimeout(300)
 expect((await probe())?.state === 'start', '换模式返回选择页')
 
+// —— 9. 反转拖拽选项（ADR-0014 补记）——
+await page.locator('#invertToggle').click()
+await page.waitForTimeout(100)
+const invLabel = await page.locator('#invertToggle').textContent()
+expect(invLabel && invLabel.includes('开'), `反转拖拽已开启（${invLabel.trim()}）`)
+await page.locator('#modeDrag').click()
+await waitState('playing')
+// 反转后：拖右 → 车头左转（yaw 正）
+await page.mouse.move(195, 600)
+await page.mouse.down()
+await page.mouse.move(360, 560, { steps: 4 })
+const t2 = Date.now()
+let inverted = false
+while (Date.now() - t2 < 1500) {
+  if ((await probe()).yaw > 0.4) {
+    inverted = true
+    break
+  }
+  await page.waitForTimeout(30)
+}
+expect(inverted, '反转生效：拖右车头左转（yaw > 0.4）')
+await page.mouse.up()
+await shot('14-invert')
+// 开关持久化
+const savedInv = await page.evaluate(() => localStorage.getItem('drift.invert'))
+expect(savedInv === '1', '反转设置已持久化')
+
 console.log('---')
 console.log('最终状态:', JSON.stringify(await probe()))
 console.log('页面错误:', errors.length ? errors : '无')

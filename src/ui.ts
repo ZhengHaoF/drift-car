@@ -13,6 +13,7 @@ export class Ui {
   private bestClassicEl = $('bestClassic')
   private bestDragEl = $('bestDrag')
   private startCoinsEl = $('startCoins')
+  private invertToggleEl = $('invertToggle')
   private resDistEl = $('resDist')
   private resBestEl = $('resBest')
   private resCoinsEl = $('resCoins')
@@ -31,6 +32,12 @@ export class Ui {
     this.startCoinsEl.textContent = `累计金币 ${coinsTotal}`
     this.lastDist = -1
     this.lastCoins = -1
+  }
+
+  /** 反转拖拽开关的文案与状态色 */
+  setInvertLabel(on: boolean) {
+    this.invertToggleEl.textContent = on ? '反转拖拽：开（左拖右转）' : '反转拖拽：关'
+    this.invertToggleEl.classList.toggle('on', on)
   }
 
   showHud() {

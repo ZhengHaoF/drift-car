@@ -221,3 +221,7 @@ body {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
+
+.mode-link.on {
+  color: #4cd964;
+}
